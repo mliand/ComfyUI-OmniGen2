@@ -60,3 +60,7 @@ pip install flash-attn==2.7.4.post1 --no-build-isolation -i https://pypi.tuna.ts
 
 
 ### Download Pretrained Models
+
+**OmniGen2**, a multimodal generation model, model weights can be accessed in [huggingface](https://huggingface.co/OmniGen2/OmniGen2) and [modelscope](https://www.modelscope.cn/models/OmniGen2/OmniGen2).
+
+
