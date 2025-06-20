@@ -20,7 +20,7 @@ git clone https://github.com/Yuan-ManX/ComfyUI-OmniGen2.git
 #### ✅ Recommended Setup
 
 ```bash
-# 1. Install dependencies
+# 1. Environment
 cd ComfyUI-OmniGen2
 
 # 2. (Optional) Create a clean Python environment
