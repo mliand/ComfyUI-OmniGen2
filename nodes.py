@@ -1,7 +1,3 @@
-import dotenv
-
-dotenv.load_dotenv(override=True)
-
 import argparse
 import os
 from typing import List, Tuple
@@ -105,7 +101,7 @@ def create_collage(images: List[torch.Tensor]) -> Image.Image:
     return to_pil_image(canvas)
 
 
-def main(model_path, dtype, input_image_path, root_dir, width, height, num_inference_step, text_guidance_scale, 
+def main(model_path, dtype, input_images, root_dir, width, height, num_inference_step, text_guidance_scale, 
          image_guidance_scale, cfg_range_start, cfg_range_end, num_images_per_prompt, instruction, negative_prompt):
     """Main function to run the image generation process."""
   
@@ -121,10 +117,60 @@ def main(model_path, dtype, input_image_path, root_dir, width, height, num_infer
 
     # Load pipeline and process inputs
     pipeline = load_pipeline(model_path, accelerator, weight_dtype)
-    input_images = preprocess(input_image_path)
 
     # Generate and save image
     results = run(width, height, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
                   num_images_per_prompt, accelerator, pipeline, instruction, negative_prompt, input_images)
 
+
+class LoadOmniGen2Image:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image_path": ("STRING", {"default": "assets/demo.png"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "input_image_path"
+    CATEGORY = "OmniGen2"
+
+    def input_image(self, image_path):
+        input_images = preprocess(image_path)
+        return (input_images,)
+
+
+class LoadOmniGen2Model:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "model_path": ("STRING", {"default": "OmniGen2/OmniGen2"}),
+                "dtype": (["fp32", "fp16", "bf16"], {"default": "bf16"}),
+                "device": (["cuda", "cpu"], {"default": "cuda"}),
+            }
+        }
+
+    RETURN_TYPES = ("MODEL",)
+    RETURN_NAMES = ("pipeline",)
+    FUNCTION = "load_model"
+    CATEGORY = "OmniGen2"
+
+    def load_model(self, model_path, dtype):
+        # Initialize accelerator
+        accelerator = Accelerator(mixed_precision=dtype if dtype != 'fp32' else 'no')
+            
+        # Set weight dtype
+        weight_dtype = torch.float32
+        if dtype == 'fp16':
+            weight_dtype = torch.float16
+        elif dtype == 'bf16':
+            weight_dtype = torch.bfloat16
+    
+        # Load pipeline and process inputs
+        pipeline = load_pipeline(model_path, accelerator, weight_dtype)
+        
+        return (pipeline,)
 
