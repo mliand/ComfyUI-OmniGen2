@@ -101,16 +101,6 @@ def create_collage(images: List[torch.Tensor]) -> Image.Image:
     return to_pil_image(canvas)
 
 
-def main(model_path, dtype, input_images, root_dir, width, height, num_inference_step, text_guidance_scale, 
-         image_guidance_scale, cfg_range_start, cfg_range_end, num_images_per_prompt, instruction, negative_prompt):
-    """Main function to run the image generation process."""
-
-
-    # Generate and save image
-    results = run(width, height, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
-                  num_images_per_prompt, accelerator, pipeline, instruction, negative_prompt, input_images)
-
-
 class LoadOmniGen2Image:
     @classmethod
     def INPUT_TYPES(s):
