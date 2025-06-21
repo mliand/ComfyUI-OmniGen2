@@ -60,8 +60,8 @@ def preprocess(input_image_path: List[str] = []) -> Tuple[str, str, List[Image.I
     return input_images
 
 
-def run(width, height, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
-        num_images_per_prompt, accelerator, pipeline, instruction, negative_prompt, input_images):
+def run(pipeline, input_images, width, height, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
+        num_images_per_prompt, accelerator, instruction, negative_prompt):
     """Run the image generation pipeline with the given parameters."""
           
     generator = torch.Generator(device=accelerator.device).manual_seed(args.seed)
@@ -104,19 +104,7 @@ def create_collage(images: List[torch.Tensor]) -> Image.Image:
 def main(model_path, dtype, input_images, root_dir, width, height, num_inference_step, text_guidance_scale, 
          image_guidance_scale, cfg_range_start, cfg_range_end, num_images_per_prompt, instruction, negative_prompt):
     """Main function to run the image generation process."""
-  
-    # Initialize accelerator
-    accelerator = Accelerator(mixed_precision=dtype if dtype != 'fp32' else 'no')
 
-    # Set weight dtype
-    weight_dtype = torch.float32
-    if dtype == 'fp16':
-        weight_dtype = torch.float16
-    elif dtype == 'bf16':
-        weight_dtype = torch.bfloat16
-
-    # Load pipeline and process inputs
-    pipeline = load_pipeline(model_path, accelerator, weight_dtype)
 
     # Generate and save image
     results = run(width, height, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
@@ -174,3 +162,40 @@ class LoadOmniGen2Model:
         
         return (pipeline,)
 
+
+class OmniGen2:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "pipeline": ("MODEL",),
+                "input_images": ("IMAGE",),
+                "dtype": (["fp32", "fp16", "bf16"], {"default": "bf16"}),
+                "width": ("INT", {"default": 1024}),
+                "height": ("INT", {"default": 1024}),
+                "num_inference_step": ("INT", {"default": 50}),
+                "text_guidance_scale": ("FLOAT", {"default": 5.0}),
+                "image_guidance_scale": ("FLOAT", {"default": 2.0}),
+                "cfg_range_start": ("FLOAT", {"default": 0.0}),
+                "cfg_range_end": ("FLOAT", {"default": 1.0}),
+                "num_images_per_prompt": ("INT", {"default": 1}),
+                "instruction": ("STRING", {"default": "A dog running in the park"}),
+                "negative_prompt": ("STRING", {"default": "(((deformed))), blurry, over saturation, bad anatomy, disfigured, poorly drawn face, mutation, mutated, (extra_limb), (ugly), (poorly drawn hands), fused fingers, messy drawing, broken legs censor, censored, censor_bar"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "generate"
+    CATEGORY = "OmniGen2"
+
+    def generate(self, pipeline, input_images, width, height, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
+                      num_images_per_prompt, accelerator, instruction, negative_prompt):
+
+        # Initialize accelerator
+        accelerator = Accelerator(mixed_precision=dtype if dtype != 'fp32' else 'no')
+                          
+        image = run(pipeline, input_images, width, height, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
+                      num_images_per_prompt, accelerator, instruction, negative_prompt)
+        
+        return (image,)
