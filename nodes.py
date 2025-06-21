@@ -185,7 +185,7 @@ class OmniGen2:
         }
 
     RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
+    RETURN_NAMES = ("results",)
     FUNCTION = "generate"
     CATEGORY = "OmniGen2"
 
@@ -195,7 +195,40 @@ class OmniGen2:
         # Initialize accelerator
         accelerator = Accelerator(mixed_precision=dtype if dtype != 'fp32' else 'no')
                           
-        image = run(pipeline, input_images, width, height, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
+        results = run(pipeline, input_images, width, height, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
                       num_images_per_prompt, accelerator, instruction, negative_prompt)
         
-        return (image,)
+        return (results,)
+
+
+class SaveOmniGen2Image:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "output_image_path": ("STRING", {"default": "output.png"}),
+                "results": ("IMAGE",),
+            }
+        }
+
+    RETURN_TYPES = ()
+    RETURN_NAMES = ()
+    FUNCTION = "save"
+    CATEGORY = "OmniGen2"
+
+    def save(self, output_image_path, results):
+
+        os.makedirs(os.path.dirname(output_image_path), exist_ok=True)
+    
+        if len(results.images) > 1:
+            for i, image in enumerate(results.images):
+                image_name, ext = os.path.splitext(output_image_path)
+                image.save(f"{image_name}_{i}{ext}")
+    
+        vis_images = [to_tensor(image) * 2 - 1 for image in results.images]
+        output_image = create_collage(vis_images)
+    
+        output_image.save(output_image_path)
+        print(f"Image saved to {output_image_path}")
+        
+        return ()
