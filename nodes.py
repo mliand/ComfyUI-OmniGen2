@@ -1,4 +1,3 @@
-import argparse
 import os
 from typing import List, Tuple
 from PIL import Image, ImageOps
