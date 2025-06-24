@@ -188,7 +188,7 @@ class OmniGen2:
                 "height": ("INT", {"default": 1024}),
                 "max_input_image_side_length": ("INT", {"default": 2048, "min": 256, "max": 2048, "step": 256}),
                 "max_pixels": ("INT", {"default": 1024 * 1024, "min": 256 * 256, "max": 1536 * 1536, "step": 256 * 256}),
-                "num_inference_step": ("INT", {"default": 20}),
+                "num_inference_step": ("INT", {"default": 50, "min": 20, "max": 100}),
                 "text_guidance_scale": ("FLOAT", {"default": 5.0}),
                 "image_guidance_scale": ("FLOAT", {"default": 2.0}),
                 "cfg_range_start": ("FLOAT", {"default": 0.0}),
