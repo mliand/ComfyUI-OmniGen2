@@ -18,7 +18,6 @@ def pil2tensor(image):
     return torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0)
 
 
-
 def load_pipeline(model_path, accelerator, weight_dtype, scheduler, offload_type):    
     pipeline = OmniGen2Pipeline.from_pretrained(
         model_path,
