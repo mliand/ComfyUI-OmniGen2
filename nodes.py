@@ -111,7 +111,7 @@ class LoadOmniGen2Image:
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
-    FUNCTION = "input_image_path"
+    FUNCTION = "input_image"
     CATEGORY = "OmniGen2"
 
     def input_image(self, image_path):
