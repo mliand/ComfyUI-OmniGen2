@@ -10,8 +10,10 @@ from .omnigen2.pipelines.omnigen2.pipeline_omnigen2 import OmniGen2Pipeline
 from .omnigen2.utils.img_util import resize_image
 
 #from diffusers.hooks import apply_group_offloading # only exists in very recent commits of diffusers
-
+import folder_paths
 import numpy as np
+
+temp_dir = folder_paths.get_temp_directory()
 
 # PIL to Tensor that works in ComfyUI
 def pil2tensor(image):
@@ -122,8 +124,12 @@ class LoadOmniGen2Image:
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
+    OUTPUT_TOOLTIPS = ("A list of PIL images. You should connect this directly to 'OmniGen2'.",)
     FUNCTION = "input_image"
     CATEGORY = "OmniGen2"
+    DESCRIPTION = """
+This node loads images from their paths and transposes them accordingly to their EXIF data.
+"""
 
     def input_image(self, image1_path, image2_path="", image3_path=""):
         for p in [image1_path, image2_path, image3_path]:
@@ -141,6 +147,7 @@ class LoadOmniGen2Model:
                 "model_path": ("STRING", {"default": "OmniGen2/OmniGen2"}),
                 "dtype": (["fp32", "fp16", "bf16"], {"default": "bf16"}),
                 "scheduler": (["euler", "dpmsolver"], {"default": "euler"}),
+                #"device": (["cuda", "cpu"], {"default": "cuda"}),
                 "offload_type": (
                     #["none", "sequential_cpu_offload", "cpu_offload", "group_offload"], 
                     ["none", "sequential_cpu_offload", "cpu_offload"], 
@@ -180,15 +187,15 @@ class OmniGen2:
                 "input_images": ("IMAGE", {"tooltip": "TIP: Connect this to 'Load OmniGen2 Image' node."}),
                 "dtype": (["fp32", "fp16", "bf16"], {"default": "bf16"}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-                "width": ("INT", {"default": 1024}),
-                "height": ("INT", {"default": 1024}),
+                "width": ("INT", {"default": 1024, "min": 256, "max": 1024, "step": 128}),   # added min/max based on the online demo - maybe unnecessary?
+                "height": ("INT", {"default": 1024, "min": 256, "max": 1024, "step": 128}),  # added min/max based on the online demo - maybe unnecessary?
                 "max_input_image_side_length": ("INT", {"default": 2048, "min": 256, "max": 2048, "step": 256}),
                 "max_pixels": ("INT", {"default": 1024 * 1024, "min": 256 * 256, "max": 1536 * 1536, "step": 256 * 256}),
-                "num_inference_step": ("INT", {"default": 50, "min": 20, "max": 100}),
-                "text_guidance_scale": ("FLOAT", {"default": 5.0}),
-                "image_guidance_scale": ("FLOAT", {"default": 2.0}),
-                "cfg_range_start": ("FLOAT", {"default": 0.0}),
-                "cfg_range_end": ("FLOAT", {"default": 1.0}),
+                "num_inference_step": ("INT", {"default": 50, "min": 1, "max": 100}), # the online demo enforces a 20 min step req but it should be up to the user
+                "text_guidance_scale": ("FLOAT", {"default": 5.0, "min": 1.0, "max": 8.0, "step": 0.1}),
+                "image_guidance_scale": ("FLOAT", {"default": 2.0, "min": 1.0, "max": 3.0, "step": 0.1}),
+                "cfg_range_start": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.1}),
+                "cfg_range_end": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.1}),
                 "num_images_per_prompt": ("INT", {"default": 1}),
                 "instruction": ("STRING", {"default": "A dog running in the park"}),
                 "negative_prompt": ("STRING", {"default": "(((deformed))), blurry, over saturation, bad anatomy, disfigured, poorly drawn face, mutation, mutated, (extra_limb), (ugly), (poorly drawn hands), fused fingers, messy drawing, broken legs censor, censored, censor_bar"}),
@@ -214,14 +221,14 @@ class OmniGen2:
         #       someone plz fix this        
         images = []
         for i, image in enumerate(results.images):
-            p = fr".\temp\tmp_omnigen2_img_{i}.png"
+            p = os.path.join(temp_dir, f"tmp_omnigen2_img_{i}.png")
             image.save(p)
             images.append(pil2tensor(Image.open(p).convert("RGB")))
         
         images_for_collage = [to_tensor(image) * 2 - 1 for image in results.images]
         collage = create_collage(images_for_collage)
         
-        collage_tmp_path = r".\temp\tmp_omnigen2_collage.png"
+        collage_tmp_path = os.path.join(temp_dir, "tmp_omnigen2_collage.png")
         collage.save(collage_tmp_path)
         collage = pil2tensor(Image.open(collage_tmp_path).convert("RGB"))
         
