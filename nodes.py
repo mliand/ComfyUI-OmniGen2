@@ -23,6 +23,7 @@ def load_pipeline(model_path, accelerator, weight_dtype, scheduler, offload_type
     pipeline = OmniGen2Pipeline.from_pretrained(
         model_path,
         torch_dtype=weight_dtype,
+        trust_remote_code=True,
     )
   
     if scheduler == "dpmsolver":
