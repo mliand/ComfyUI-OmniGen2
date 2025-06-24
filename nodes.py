@@ -11,12 +11,18 @@ from .omnigen2.utils.img_util import resize_image
 
 #from diffusers.hooks import apply_group_offloading # only exists in very recent commits of diffusers
 
+import numpy as np
+
+# PIL to Tensor that works in ComfyUI
+def pil2tensor(image):
+    return torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0)
+
+
 
 def load_pipeline(model_path, accelerator, weight_dtype, scheduler, offload_type):    
     pipeline = OmniGen2Pipeline.from_pretrained(
         model_path,
         torch_dtype=weight_dtype,
-        #trust_remote_code=True,
     )
   
     if scheduler == "dpmsolver":
@@ -53,21 +59,23 @@ def preprocess(image1_path: str, image2_path: str, image3_path: str) -> List[Ima
     
     input_images = [Image.open(path).convert("RGB") for path in image_paths]
     input_images = [ImageOps.exif_transpose(img) for img in input_images]
-
+    
     return input_images
 
 
-def run(pipeline, input_images, seed, width, height, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
+def run(pipeline, input_images, seed, width, height, max_input_image_side_length, max_pixels, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
         num_images_per_prompt, accelerator, instruction, negative_prompt):
     """Run the image generation pipeline with the given parameters."""
           
     generator = torch.Generator(device=accelerator.device).manual_seed(seed)
-
+    
     results = pipeline(
         prompt=instruction,
         input_images=input_images,
         width=width,
         height=height,
+        max_input_image_side_length=max_input_image_side_length,
+        max_pixels=max_pixels,
         num_inference_steps=num_inference_step,
         max_sequence_length=1024,
         text_guidance_scale=text_guidance_scale,
@@ -78,11 +86,11 @@ def run(pipeline, input_images, seed, width, height, num_inference_step, text_gu
         generator=generator,
         output_type="pil",
     )
-          
+    
     return results
 
 
-def create_collage(images: List[torch.Tensor]) -> torch.Tensor:
+def create_collage(images: List[torch.Tensor]) -> Image.Image:
     """Create a horizontal collage from a list of images."""
   
     max_height = max(img.shape[-2] for img in images)
@@ -95,7 +103,7 @@ def create_collage(images: List[torch.Tensor]) -> torch.Tensor:
         canvas[:, :h, current_x:current_x+w] = img * 0.5 + 0.5
         current_x += w
     
-    return canvas
+    return to_pil_image(canvas)
 
 
 class LoadOmniGen2Image:
@@ -118,7 +126,6 @@ class LoadOmniGen2Image:
     CATEGORY = "OmniGen2"
     DESCRIPTION = """
 This node loads images from their paths and transposes them accordingly to their EXIF data.
-ATTENTION: the output of this node is a list of PIL images. ComfyUI normally transfers images as torch.Tensor in between nodes so its highly recommended you connect the output of this node directly to 'OmniGen2'.
 """
 
     def input_image(self, image1_path, image2_path="", image3_path=""):
@@ -179,7 +186,9 @@ class OmniGen2:
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "width": ("INT", {"default": 1024}),
                 "height": ("INT", {"default": 1024}),
-                "num_inference_step": ("INT", {"default": 50}),
+                "max_input_image_side_length": ("INT", {"default": 2048, "min": 256, "max": 2048, "step": 256}),
+                "max_pixels": ("INT", {"default": 1024 * 1024, "min": 256 * 256, "max": 1536 * 1536, "step": 256 * 256}),
+                "num_inference_step": ("INT", {"default": 20}),
                 "text_guidance_scale": ("FLOAT", {"default": 5.0}),
                 "image_guidance_scale": ("FLOAT", {"default": 2.0}),
                 "cfg_range_start": ("FLOAT", {"default": 0.0}),
@@ -191,24 +200,36 @@ class OmniGen2:
         }
 
     RETURN_TYPES = ("IMAGE", "IMAGE",)
-    RETURN_NAMES = ("images", "collage",)
-    OUTPUT_IS_LIST = (True, False,)
+    RETURN_NAMES = ("collage", "images",)
+    OUTPUT_IS_LIST = (False, True,)
     FUNCTION = "generate"
     CATEGORY = "OmniGen2"
 
-    def generate(self, pipeline, input_images, dtype, seed, width, height, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
+    def generate(self, pipeline, input_images, dtype, seed, width, height, max_input_image_side_length, max_pixels, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
                       num_images_per_prompt, instruction, negative_prompt):
 
         # Initialize accelerator
         accelerator = Accelerator(mixed_precision=dtype if dtype != 'fp32' else 'no')
                           
-        results = run(pipeline, input_images, seed, width, height, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
-                      num_images_per_prompt, accelerator, instruction, negative_prompt)
-                      
-        images = [to_tensor(image) * 2 - 1 for image in results.images]
-        collage = create_collage(images)
+        results = run(pipeline, input_images, seed, width, height, max_input_image_side_length, max_pixels, num_inference_step, text_guidance_scale, image_guidance_scale, 
+                      cfg_range_start, cfg_range_end, num_images_per_prompt, accelerator, instruction, negative_prompt)
         
-        return (images, collage,)
+        # NOTE: I cant figure out how to send outputs here without losing colors so for now I'm saving the images in .\temp\ and loading them afterwards -.-
+        #       someone plz fix this        
+        images = []
+        for i, image in enumerate(results.images):
+            p = fr".\temp\tmp_omnigen2_img_{i}.png"
+            image.save(p)
+            images.append(pil2tensor(Image.open(p).convert("RGB")))
+        
+        images_for_collage = [to_tensor(image) * 2 - 1 for image in results.images]
+        collage = create_collage(images_for_collage)
+        
+        collage_tmp_path = r".\temp\tmp_omnigen2_collage.png"
+        collage.save(collage_tmp_path)
+        collage = pil2tensor(Image.open(collage_tmp_path).convert("RGB"))
+        
+        return (collage, images,)
 
 
 

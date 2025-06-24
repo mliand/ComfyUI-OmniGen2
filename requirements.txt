@@ -15,4 +15,4 @@ omegaconf
 python-dotenv
 ninja
 ipykernel
-
+numpy
