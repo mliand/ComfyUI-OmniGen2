@@ -20,7 +20,6 @@ def pil2tensor(image):
     return torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0)
 
 
-
 def load_pipeline(model_path, accelerator, weight_dtype, scheduler, offload_type):    
     pipeline = OmniGen2Pipeline.from_pretrained(
         model_path,
@@ -124,12 +123,8 @@ class LoadOmniGen2Image:
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
-    OUTPUT_TOOLTIPS = ("A list of PIL images. You should connect this directly to 'OmniGen2'.",)
     FUNCTION = "input_image"
     CATEGORY = "OmniGen2"
-    DESCRIPTION = """
-This node loads images from their paths and transposes them accordingly to their EXIF data.
-"""
 
     def input_image(self, image1_path, image2_path="", image3_path=""):
         for p in [image1_path, image2_path, image3_path]:
@@ -147,7 +142,6 @@ class LoadOmniGen2Model:
                 "model_path": ("STRING", {"default": "OmniGen2/OmniGen2"}),
                 "dtype": (["fp32", "fp16", "bf16"], {"default": "bf16"}),
                 "scheduler": (["euler", "dpmsolver"], {"default": "euler"}),
-                #"device": (["cuda", "cpu"], {"default": "cuda"}),
                 "offload_type": (
                     #["none", "sequential_cpu_offload", "cpu_offload", "group_offload"], 
                     ["none", "sequential_cpu_offload", "cpu_offload"], 
@@ -233,6 +227,3 @@ class OmniGen2:
         collage = pil2tensor(Image.open(collage_tmp_path).convert("RGB"))
         
         return (collage, images,)
-
-
-
