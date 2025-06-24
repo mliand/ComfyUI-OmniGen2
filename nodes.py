@@ -10,6 +10,7 @@ from .omnigen2.pipelines.omnigen2.pipeline_omnigen2 import OmniGen2Pipeline
 from .omnigen2.utils.img_util import resize_image
 
 #from diffusers.hooks import apply_group_offloading # only exists in very recent commits of diffusers
+
 import folder_paths
 import numpy as np
 
@@ -227,3 +228,6 @@ class OmniGen2:
         collage = pil2tensor(Image.open(collage_tmp_path).convert("RGB"))
         
         return (collage, images,)
+
+
+
