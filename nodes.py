@@ -147,7 +147,7 @@ class LoadOmniGen2Model:
                 "offload_type": (
                     #["none", "sequential_cpu_offload", "cpu_offload", "group_offload"], 
                     ["none", "sequential_cpu_offload", "cpu_offload"], 
-                    {"default": "cpu_offload", "toolip": "Set this to 'sequential_cpu_offload' if you face memory allocation issues."}
+                    {"default": "cpu_offload"}
                 ),
             }
         }
