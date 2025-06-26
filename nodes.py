@@ -67,12 +67,13 @@ def preprocess(image1_path: str, image2_path: str, image3_path: str) -> List[Ima
 
 
 def run(pipeline, input_images, seed, width, height, max_input_image_side_length, max_pixels, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
-        num_images_per_prompt, accelerator, instruction, negative_prompt):
+        num_images_per_prompt, accelerator, instruction, negative_prompt, role_prompt):
     """Run the image generation pipeline with the given parameters."""
           
     generator = torch.Generator(device=accelerator.device).manual_seed(seed)
     
     results = pipeline(
+        role_prompt=role_prompt,
         prompt=instruction,
         input_images=input_images,
         width=width,
@@ -142,11 +143,11 @@ class LoadOmniGen2Model:
             "required": {
                 "model_path": ("STRING", {"default": "OmniGen2/OmniGen2"}),
                 "dtype": (["fp32", "fp16", "bf16"], {"default": "bf16"}),
-                "scheduler": (["euler", "dpmsolver"], {"default": "euler"}),
+                "scheduler": (["euler", "dpmsolver"], {"default": "dpmsolver"}),
                 "offload_type": (
                     #["none", "sequential_cpu_offload", "cpu_offload", "group_offload"], 
                     ["none", "sequential_cpu_offload", "cpu_offload"], 
-                    {"default": "sequential_cpu_offload"}
+                    {"default": "cpu_offload"}
                 ),
             }
         }
@@ -182,18 +183,19 @@ class OmniGen2:
                 "input_images": ("IMAGE", {"tooltip": "TIP: Connect this to 'Load OmniGen2 Image' node."}),
                 "dtype": (["fp32", "fp16", "bf16"], {"default": "bf16"}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-                "width": ("INT", {"default": 1024, "min": 256, "max": 1024, "step": 128}),   # added min/max based on the online demo - maybe unnecessary?
-                "height": ("INT", {"default": 1024, "min": 256, "max": 1024, "step": 128}),  # added min/max based on the online demo - maybe unnecessary?
-                "max_input_image_side_length": ("INT", {"default": 2048, "min": 256, "max": 2048, "step": 256}),
-                "max_pixels": ("INT", {"default": 1024 * 1024, "min": 256 * 256, "max": 1536 * 1536, "step": 256 * 256}),
-                "num_inference_step": ("INT", {"default": 50, "min": 1, "max": 100}), # the online demo enforces a 20 min step req but it should be up to the user
+                "width": ("INT", {"default": 1024, "min": 256, "max": 4096, "step": 128}),
+                "height": ("INT", {"default": 1024, "min": 256, "max": 4096, "step": 128}),
+                "max_input_image_side_length": ("INT", {"default": 2048, "min": 256, "max": 2048 * 4, "step": 256}),
+                "max_pixels": ("INT", {"default": 1024 * 1024, "min": 256 * 256, "max": 4096 * 4096, "step": 256 * 256}),
+                "num_inference_step": ("INT", {"default": 30, "min": 1, "max": 100}),
                 "text_guidance_scale": ("FLOAT", {"default": 5.0, "min": 1.0, "max": 8.0, "step": 0.1}),
-                "image_guidance_scale": ("FLOAT", {"default": 2.0, "min": 1.0, "max": 3.0, "step": 0.1}),
+                "image_guidance_scale": ("FLOAT", {"default": 2.0, "min": 0.0, "max": 3.0, "step": 0.1, "tooltip": "Image Editing: 1.3 - 2.0\nIn-context Generation: 2.0 - 3.0\n0 value means image inputs will be ignored (pure txt2img)"}),
                 "cfg_range_start": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.1}),
                 "cfg_range_end": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.1}),
                 "num_images_per_prompt": ("INT", {"default": 1}),
                 "instruction": ("STRING", {"default": "A dog running in the park"}),
                 "negative_prompt": ("STRING", {"default": "(((deformed))), blurry, over saturation, bad anatomy, disfigured, poorly drawn face, mutation, mutated, (extra_limb), (ugly), (poorly drawn hands), fused fingers, messy drawing, broken legs censor, censored, censor_bar"}),
+                "role_prompt": ("STRING", {"default": "You are a helpful assistant that generates high-quality images based on user instructions."}),
             }
         }
 
@@ -202,15 +204,16 @@ class OmniGen2:
     OUTPUT_IS_LIST = (False, True,)
     FUNCTION = "generate"
     CATEGORY = "OmniGen2"
+    DESCRIPTION = "TIP: Set 'image_guidance_scale' to 0 to unlock pure txt2img mode (input_images will be ignored)."
 
     def generate(self, pipeline, input_images, dtype, seed, width, height, max_input_image_side_length, max_pixels, num_inference_step, text_guidance_scale, image_guidance_scale, cfg_range_start, cfg_range_end, 
-                      num_images_per_prompt, instruction, negative_prompt):
+                      num_images_per_prompt, instruction, negative_prompt, role_prompt):
 
         # Initialize accelerator
         accelerator = Accelerator(mixed_precision=dtype if dtype != 'fp32' else 'no')
                           
-        results = run(pipeline, input_images, seed, width, height, max_input_image_side_length, max_pixels, num_inference_step, text_guidance_scale, image_guidance_scale, 
-                      cfg_range_start, cfg_range_end, num_images_per_prompt, accelerator, instruction, negative_prompt)
+        results = run(pipeline, input_images if image_guidance_scale != 0 else None, seed, width, height, max_input_image_side_length, max_pixels, num_inference_step, text_guidance_scale, image_guidance_scale, 
+                      cfg_range_start, cfg_range_end, num_images_per_prompt, accelerator, instruction, negative_prompt, role_prompt)
         
         # NOTE: I cant figure out how to send outputs here without losing colors so for now I'm saving the images in .\temp\ and loading them afterwards -.-
         #       someone plz fix this        

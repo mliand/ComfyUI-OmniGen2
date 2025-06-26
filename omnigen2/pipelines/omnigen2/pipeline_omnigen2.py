@@ -325,11 +325,11 @@ class OmniGen2Pipeline(DiffusionPipeline):
 
         return prompt_embeds, prompt_attention_mask
     
-    def _apply_chat_template(self, prompt: str):
+    def _apply_chat_template(self, prompt: str, role_prompt: Optional[str] = None):
         prompt = [
             {
                 "role": "system",
-                "content": "You are a helpful assistant that generates high-quality images based on user instructions.",
+                "content": role_prompt if role_prompt is not None and role_prompt.strip() != "" else "You are a helpful assistant that generates high-quality images based on user instructions.",
             },
             {"role": "user", "content": prompt},
         ]
@@ -339,6 +339,7 @@ class OmniGen2Pipeline(DiffusionPipeline):
     def encode_prompt(
         self,
         prompt: Union[str, List[str]],
+        role_prompt: Optional[str] = None,
         do_classifier_free_guidance: bool = True,
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: int = 1,
@@ -376,7 +377,7 @@ class OmniGen2Pipeline(DiffusionPipeline):
         device = device or self._execution_device
 
         prompt = [prompt] if isinstance(prompt, str) else prompt
-        prompt = [self._apply_chat_template(_prompt) for _prompt in prompt]
+        prompt = [self._apply_chat_template(_prompt, role_prompt) for _prompt in prompt]
 
         if prompt is not None:
             batch_size = len(prompt)
@@ -402,7 +403,7 @@ class OmniGen2Pipeline(DiffusionPipeline):
 
             # Normalize str to list
             negative_prompt = batch_size * [negative_prompt] if isinstance(negative_prompt, str) else negative_prompt
-            negative_prompt = [self._apply_chat_template(_negative_prompt) for _negative_prompt in negative_prompt]
+            negative_prompt = [self._apply_chat_template(_negative_prompt, role_prompt) for _negative_prompt in negative_prompt]
 
             if prompt is not None and type(prompt) is not type(negative_prompt):
                 raise TypeError(
@@ -453,6 +454,7 @@ class OmniGen2Pipeline(DiffusionPipeline):
     @torch.no_grad()
     def __call__(
         self,
+        role_prompt: Optional[str] = None,
         prompt: Optional[Union[str, List[str]]] = None,
         negative_prompt: Optional[Union[str, List[str]]] = None,
         prompt_embeds: Optional[torch.FloatTensor] = None,
@@ -508,6 +510,7 @@ class OmniGen2Pipeline(DiffusionPipeline):
             negative_prompt_attention_mask,
         ) = self.encode_prompt(
             prompt,
+            role_prompt,
             self.text_guidance_scale > 1.0,
             negative_prompt=negative_prompt,
             num_images_per_prompt=num_images_per_prompt,
