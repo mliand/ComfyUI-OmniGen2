@@ -29,7 +29,6 @@ def load_pipeline(model_path, accelerator, weight_dtype, scheduler, offload_type
         model_path,
         torch_dtype=weight_dtype,
         trust_remote_code=True,
-        local_files_only=True,
     )
   
     if scheduler == "dpmsolver":
