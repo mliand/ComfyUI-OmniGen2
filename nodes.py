@@ -16,6 +16,9 @@ import numpy as np
 
 temp_dir = folder_paths.get_temp_directory()
 
+OMNIGEN2_MODEL_DIR = os.path.join(folder_paths.models_dir, "omnigen2")
+folder_paths.add_model_folder_path("omnigen2", OMNIGEN2_MODEL_DIR, is_default=True)
+
 # PIL to Tensor that works in ComfyUI
 def pil2tensor(image):
     return torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0)
@@ -26,6 +29,7 @@ def load_pipeline(model_path, accelerator, weight_dtype, scheduler, offload_type
         model_path,
         torch_dtype=weight_dtype,
         trust_remote_code=True,
+        local_files_only=True,
     )
   
     if scheduler == "dpmsolver":
@@ -141,7 +145,7 @@ class LoadOmniGen2Model:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "model_path": ("STRING", {"default": "OmniGen2/OmniGen2"}),
+                "model_path": ("STRING", {"default": "omnigen2/OmniGen2"}),
                 "dtype": (["fp32", "fp16", "bf16"], {"default": "bf16"}),
                 "scheduler": (["euler", "dpmsolver"], {"default": "dpmsolver"}),
                 "offload_type": (
