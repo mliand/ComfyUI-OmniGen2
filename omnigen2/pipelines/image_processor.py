@@ -100,7 +100,13 @@ class OmniGen2ImageProcessor(VaeImageProcessor):
             if isinstance(image, PIL.Image.Image):
                 height = image.height
             elif isinstance(image, torch.Tensor):
-                height = image.shape[2]
+                if image.ndim == 4:
+                    if image.shape[1] <= 4:
+                        height = image.shape[2]
+                    else:
+                        height = image.shape[1]
+                else:
+                    height = image.shape[1]
             else:
                 height = image.shape[1]
 
@@ -108,23 +114,29 @@ class OmniGen2ImageProcessor(VaeImageProcessor):
             if isinstance(image, PIL.Image.Image):
                 width = image.width
             elif isinstance(image, torch.Tensor):
-                width = image.shape[3]
+                if image.ndim == 4:
+                    if image.shape[1] <= 4:
+                        width = image.shape[3]
+                    else:
+                        width = image.shape[2]
+                else:
+                    width = image.shape[2]
             else:
                 width = image.shape[2]
-        
+
         if max_side_length is None:
             max_side_length = self.max_side_length
-        
+
         if max_pixels is None:
             max_pixels = self.max_pixels
-        
+
         ratio = 1.0
         if max_side_length is not None:
             if height > width:
                 max_side_length_ratio = max_side_length / height
             else:
                 max_side_length_ratio = max_side_length / width
-        
+
         cur_pixels = height * width
         max_pixels_ratio = (max_pixels / cur_pixels) ** 0.5
         ratio = min(max_pixels_ratio, max_side_length_ratio, 1.0) # do not upscale input image
@@ -236,6 +248,9 @@ class OmniGen2ImageProcessor(VaeImageProcessor):
         elif isinstance(image[0], torch.Tensor):
             image = torch.cat(image, axis=0) if image[0].ndim == 4 else torch.stack(image, axis=0)
 
+            if image.ndim == 4 and image.shape[-1] == 3:
+                image = image.permute(0, 3, 1, 2).contiguous()
+
             if self.config.do_convert_grayscale and image.ndim == 3:
                 image = image.unsqueeze(1)
 
@@ -245,6 +260,8 @@ class OmniGen2ImageProcessor(VaeImageProcessor):
                 return image
 
             height, width = self.get_new_height_width(image, height, width, max_pixels, max_side_length)
+            if width <= 0 or height <= 0:
+                raise ValueError(f"[OmniGen2][preprocess] Invalid width or height in preprocess: width={width}, height={height}, image.shape={getattr(image, 'shape', None)}")
             if self.config.do_resize:
                 image = self.resize(image, height, width)
 
